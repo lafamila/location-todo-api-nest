@@ -1,0 +1,8 @@
+dist
+node_modules
+web/dist
+coverage
+package-lock.json
+AGENTS.md
+CLAUDE.md
+.idea

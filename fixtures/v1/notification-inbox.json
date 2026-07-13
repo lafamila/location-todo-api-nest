@@ -1,0 +1,40 @@
+{
+  "listResponse": {
+    "notifications": [
+      {
+        "eventId": "00000000-0000-4000-8000-000000000050",
+        "cursor": 42,
+        "type": "TODO_TRIGGERED",
+        "todoId": "00000000-0000-4000-8000-000000000051",
+        "occurrenceKey": "2026-07-13T17:30",
+        "content": "Submit weekly report",
+        "triggeredAt": "2026-07-13T08:30:00.000Z",
+        "acknowledgedAt": null,
+        "createdAt": "2026-07-13T08:30:00.010Z"
+      }
+    ],
+    "nextCursor": 42
+  },
+  "ackRequest": {
+    "eventIds": ["00000000-0000-4000-8000-000000000050"]
+  },
+  "ackResponse": {
+    "acknowledged": 1
+  },
+  "listResponseAfterAck": {
+    "notifications": [
+      {
+        "eventId": "00000000-0000-4000-8000-000000000050",
+        "cursor": 42,
+        "type": "TODO_TRIGGERED",
+        "todoId": "00000000-0000-4000-8000-000000000051",
+        "occurrenceKey": "2026-07-13T17:30",
+        "content": "Submit weekly report",
+        "triggeredAt": "2026-07-13T08:30:00.000Z",
+        "acknowledgedAt": "2026-07-13T08:31:00.000Z",
+        "createdAt": "2026-07-13T08:30:00.010Z"
+      }
+    ],
+    "nextCursor": 42
+  }
+}

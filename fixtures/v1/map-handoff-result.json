@@ -1,0 +1,11 @@
+{
+  "type": "LOCATION_TODO_MAP_RESULT",
+  "handoffId": "00000000-0000-4000-8000-000000000040",
+  "accountId": "00000000-0000-4000-8000-000000000010",
+  "draftNonce": "flutter-draft-7fdb",
+  "address": "서울특별시 중구 세종대로 110",
+  "latitude": 37.5665,
+  "longitude": 126.978,
+  "radiusMeters": 250,
+  "placeMetadata": { "provider": "kakao", "placeId": "example" }
+}

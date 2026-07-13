@@ -1,0 +1,26 @@
+{
+  "serviceKey": "location-todo",
+  "name": "Location Todo",
+  "permissions": [
+    {
+      "key": "user",
+      "label": "User",
+      "description": "Expanded Location Todo geofence and location TODO quotas"
+    }
+  ],
+  "oidcClients": [
+    {
+      "clientId": "location-todo-api",
+      "clientType": "confidential",
+      "redirectUris": [
+        "http://localhost:3042/api/session/oidc/callback",
+        "https://loc.lafamila.xyz/api/session/oidc/callback"
+      ],
+      "allowedScopes": ["openid", "profile", "email", "service.permission"],
+      "requirePkce": true,
+      "accessTokenTtlSeconds": 900,
+      "refreshTokenTtlSeconds": 2592000
+    }
+  ],
+  "serviceCredentials": []
+}

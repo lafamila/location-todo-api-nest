@@ -1,6 +1,8 @@
 ---
-status: PREPARED
+status: COMPLETED
 summary: "Location Todo의 OIDC BFF, 위치·시간 반복 scheduler, Kakao 기반 웹 UI와 멀티디바이스 알림 API 구현"
+completed_at: 2026-07-13
+completion_reason: "Nest API·React 웹·PostgreSQL workers·Docker 구현과 단위 21개·통합 39개 검증을 완료했다."
 ---
 
 # LOCATION TODO — location-todo-api-nest execution plan

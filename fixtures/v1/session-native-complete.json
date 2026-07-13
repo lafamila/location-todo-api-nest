@@ -1,0 +1,16 @@
+{
+  "request": {
+    "loginTransactionId": "00000000-0000-4000-8000-000000000001",
+    "installationId": "install-ios-01"
+  },
+  "response": {
+    "sessionToken": "opaque-location-todo-session-token",
+    "expiresAt": "2027-01-01T00:00:00.000Z",
+    "account": {
+      "id": "00000000-0000-4000-8000-000000000010",
+      "displayName": "Location User",
+      "email": "user@example.com",
+      "permission": "visitor"
+    }
+  }
+}

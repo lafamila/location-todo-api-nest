@@ -1,0 +1,13 @@
+{
+  "content": "Buy groceries",
+  "kind": "LOCATION",
+  "timezone": "Asia/Seoul",
+  "recurrence": {
+    "type": "WEEKLY",
+    "startDate": "2026-07-13",
+    "weekdays": [1, 4]
+  },
+  "triggerCondition": { "type": "DWELL", "dwellMinutes": 10 },
+  "scheduleWindows": [{ "startTime": "09:00", "endTime": "24:00" }],
+  "geofenceIds": ["00000000-0000-4000-8000-000000000020"]
+}

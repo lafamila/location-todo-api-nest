@@ -1,0 +1,24 @@
+{
+  "request": {
+    "events": [
+      {
+        "id": "00000000-0000-4000-8000-000000000030",
+        "sequence": 41,
+        "geofenceId": "00000000-0000-4000-8000-000000000020",
+        "transition": "ENTER",
+        "observedAt": "2026-07-13T01:00:00.000Z",
+        "accuracyMeters": 35
+      }
+    ]
+  },
+  "response": {
+    "acks": [
+      {
+        "id": "00000000-0000-4000-8000-000000000030",
+        "sequence": 41,
+        "status": "ACCEPTED",
+        "disposition": "TRIGGERED"
+      }
+    ]
+  }
+}
