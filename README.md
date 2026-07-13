@@ -1,6 +1,6 @@
 # location-todo-api-nest
 
-Location Todo의 API, `auth-api-nest` OIDC BFF, PostgreSQL 알림 파이프라인, React/Vite 등록·관리 웹을 제공한다.
+Location Todo의 API, `auth-api-nest` OIDC BFF, PostgreSQL 위치·시간 반복 알림 파이프라인, React/Vite 등록·관리 웹을 제공한다.
 
 현재 repo는 실행 계획과 배포 계약만 준비된 bootstrap 상태다. 구현은 [repo execution plan](./.idea/LOCATION_TODO_LOCATION_TODO_API_NEST_PLAN.md)을 따른다.
 
