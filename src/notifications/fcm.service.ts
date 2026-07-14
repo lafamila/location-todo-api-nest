@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { importPKCS8, SignJWT } from "jose";
 import { ConfigService } from "../config/config.service";
 import { fetchWithTimeout } from "../common/fetch-timeout";
@@ -12,10 +12,27 @@ export interface DeliveryResult {
 }
 
 @Injectable()
-export class FcmService {
+export class FcmService implements OnModuleInit {
   private oauth?: { token: string; expiresAt: number };
+  private credentialStatus: "not_configured" | "checking" | "valid" | "error" =
+    "not_configured";
+  private readonly logger = new Logger(FcmService.name);
 
   constructor(private readonly config: ConfigService) {}
+
+  onModuleInit(): void {
+    if (!this.configured()) return;
+    this.credentialStatus = "checking";
+    void this.accessToken()
+      .then(() =>
+        this.logger.log("Firebase credentials accepted by Google OAuth"),
+      )
+      .catch((error: unknown) =>
+        this.logger.warn(
+          `Firebase credential check failed: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
+  }
 
   configured(): boolean {
     const value = this.config.value;
@@ -24,6 +41,16 @@ export class FcmService {
       value.firebaseClientEmail &&
       value.firebasePrivateKey,
     );
+  }
+
+  status(): {
+    configured: boolean;
+    credentialStatus: "not_configured" | "checking" | "valid" | "error";
+  } {
+    return {
+      configured: this.configured(),
+      credentialStatus: this.credentialStatus,
+    };
   }
 
   async send(
@@ -89,42 +116,48 @@ export class FcmService {
   private async accessToken(): Promise<string> {
     if (this.oauth && this.oauth.expiresAt > Date.now() + 60_000)
       return this.oauth.token;
-    const now = Math.floor(Date.now() / 1000);
-    const key = await importPKCS8(
-      this.config.value.firebasePrivateKey!,
-      "RS256",
-    );
-    const assertion = await new SignJWT({
-      scope: "https://www.googleapis.com/auth/firebase.messaging",
-    })
-      .setProtectedHeader({ alg: "RS256", typ: "JWT" })
-      .setIssuer(this.config.value.firebaseClientEmail!)
-      .setAudience("https://oauth2.googleapis.com/token")
-      .setIssuedAt(now)
-      .setExpirationTime(now + 3600)
-      .sign(key);
-    const response = await fetchWithTimeout(
-      "https://oauth2.googleapis.com/token",
-      {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-          assertion,
-        }),
-      },
-    );
-    if (!response.ok)
-      throw new Error(`Firebase OAuth failed (${response.status})`);
-    const value = (await response.json()) as {
-      access_token?: string;
-      expires_in?: number;
-    };
-    if (!value.access_token) throw new Error("Firebase OAuth token missing");
-    this.oauth = {
-      token: value.access_token,
-      expiresAt: Date.now() + (value.expires_in || 3600) * 1000,
-    };
-    return value.access_token;
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      const key = await importPKCS8(
+        this.config.value.firebasePrivateKey!,
+        "RS256",
+      );
+      const assertion = await new SignJWT({
+        scope: "https://www.googleapis.com/auth/firebase.messaging",
+      })
+        .setProtectedHeader({ alg: "RS256", typ: "JWT" })
+        .setIssuer(this.config.value.firebaseClientEmail!)
+        .setAudience("https://oauth2.googleapis.com/token")
+        .setIssuedAt(now)
+        .setExpirationTime(now + 3600)
+        .sign(key);
+      const response = await fetchWithTimeout(
+        "https://oauth2.googleapis.com/token",
+        {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+            assertion,
+          }),
+        },
+      );
+      if (!response.ok)
+        throw new Error(`Firebase OAuth failed (${response.status})`);
+      const value = (await response.json()) as {
+        access_token?: string;
+        expires_in?: number;
+      };
+      if (!value.access_token) throw new Error("Firebase OAuth token missing");
+      this.oauth = {
+        token: value.access_token,
+        expiresAt: Date.now() + (value.expires_in || 3600) * 1000,
+      };
+      this.credentialStatus = "valid";
+      return value.access_token;
+    } catch (error) {
+      this.credentialStatus = "error";
+      throw error;
+    }
   }
 }

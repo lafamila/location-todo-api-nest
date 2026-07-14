@@ -10,6 +10,9 @@ const keys = [
   "AUTH_JWKS_URL",
   "LOCATION_TODO_OIDC_REDIRECT_URI",
   "LOCATION_TODO_OIDC_CLIENT_SECRET",
+  "FIREBASE_PROJECT_ID",
+  "FIREBASE_CLIENT_EMAIL",
+  "FIREBASE_PRIVATE_KEY",
 ] as const;
 
 describe("application configuration", () => {
@@ -49,6 +52,14 @@ describe("application configuration", () => {
     process.env.AUTH_JWKS_URL = "http://auth.example/jwks";
     expect(() => loadAppConfig()).toThrow("AUTH_JWKS_URL must use HTTPS");
   });
+
+  test("fails production startup when Firebase delivery is not configured", () => {
+    setSecureProduction();
+    delete process.env.FIREBASE_PRIVATE_KEY;
+    expect(() => loadAppConfig()).toThrow(
+      "Firebase configuration is required in production: FIREBASE_PRIVATE_KEY",
+    );
+  });
 });
 
 function setSecureProduction(): void {
@@ -61,4 +72,7 @@ function setSecureProduction(): void {
   process.env.LOCATION_TODO_OIDC_REDIRECT_URI =
     "https://loc.example/api/session/oidc/callback";
   process.env.LOCATION_TODO_OIDC_CLIENT_SECRET = "secret";
+  process.env.FIREBASE_PROJECT_ID = "firebase-project";
+  process.env.FIREBASE_CLIENT_EMAIL = "firebase@example.test";
+  process.env.FIREBASE_PRIVATE_KEY = "private-key";
 }

@@ -1,4 +1,5 @@
 import { fetchWithTimeout } from "../src/common/fetch-timeout";
+import { FcmService } from "../src/notifications/fcm.service";
 
 describe("FCM transport timeout", () => {
   const originalFetch = global.fetch;
@@ -24,5 +25,20 @@ describe("FCM transport timeout", () => {
     });
     await jest.advanceTimersByTimeAsync(100);
     await rejection;
+  });
+});
+
+describe("FCM configuration diagnostics", () => {
+  test("reports missing credentials without attempting provider delivery", async () => {
+    const fcm = new FcmService({ value: {} } as any);
+
+    expect(fcm.status()).toEqual({
+      configured: false,
+      credentialStatus: "not_configured",
+    });
+    await expect(fcm.send("token", {})).resolves.toMatchObject({
+      ok: false,
+      code: "FCM_NOT_CONFIGURED",
+    });
   });
 });

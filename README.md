@@ -52,9 +52,19 @@ docker build -t location-todo-api-nest .
 docker run --env-file .env -p 3042:3042 location-todo-api-nest
 ```
 
-The container runs migrations before starting the process and exposes a Docker `HEALTHCHECK` against `/api/health`. Set `PUBLIC_ORIGIN=https://loc.lafamila.xyz`, `WEB_ALLOWED_ORIGINS` to exact allowed origins (`ALLOWED_ORIGINS` remains a compatibility alias), `DATABASE_SSL` for the target PostgreSQL service, and inject secrets from a secret manager. Production rejects insecure public/auth URLs and a missing OIDC client secret. Do not put OIDC client secrets, auth refresh tokens, Kakao REST keys, or Firebase credentials in web/Flutter build variables.
+The container runs migrations before starting the process and exposes a Docker `HEALTHCHECK` against `/api/health`. Set `PUBLIC_ORIGIN=https://loc.lafamila.xyz`, `WEB_ALLOWED_ORIGINS` to exact allowed origins (`ALLOWED_ORIGINS` remains a compatibility alias), `DATABASE_SSL` for the target PostgreSQL service, and inject secrets from a secret manager. Production rejects insecure public/auth URLs and missing OIDC or Firebase credentials. Do not put OIDC client secrets, auth refresh tokens, Kakao REST keys, or Firebase credentials in web/Flutter build variables.
 
 External provisioning still required for production: DNS/TLS and reverse proxy for `loc.lafamila.xyz`, Kakao `Location Todo` app REST/JavaScript keys plus exact domains, Firebase `location-todo` service account plus iOS APNs connection, and auth onboarding approval/one-time OIDC client secret.
+
+### FCM diagnostics
+
+`GET /api/health` reports `workers.enabled` plus Firebase configuration and Google OAuth credential status without exposing credentials. After a location trigger, the web device list must show `pushTokenRegistered`, and the inbox must contain the event. Inspect recent provider attempts without returning raw tokens:
+
+```bash
+psql "$DATABASE_URL" -f scripts/fcm-diagnostics.sql
+```
+
+An inbox event with no outbox row means no active device existed when the trigger was emitted. `PUSH_TOKEN_MISSING` means the mobile app did not register its FCM token; `FCM_NOT_CONFIGURED` means deployment secrets are missing; `FCM_REJECTED` with HTTP 401/403 usually indicates project permission or iOS APNs authentication problems; `INVALID_TOKEN` requires the app to refresh and register its token again.
 
 ## Auth Onboarding
 

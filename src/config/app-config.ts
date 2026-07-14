@@ -202,4 +202,15 @@ function assertProductionConfig(config: AppConfig): void {
     throw new Error(
       "LOCATION_TODO_OIDC_CLIENT_SECRET is required in production",
     );
+  const missingFirebase = [
+    ["FIREBASE_PROJECT_ID", config.firebaseProjectId],
+    ["FIREBASE_CLIENT_EMAIL", config.firebaseClientEmail],
+    ["FIREBASE_PRIVATE_KEY", config.firebasePrivateKey],
+  ]
+    .filter(([, value]) => !value?.trim())
+    .map(([name]) => name);
+  if (missingFirebase.length)
+    throw new Error(
+      `Firebase configuration is required in production: ${missingFirebase.join(", ")}`,
+    );
 }

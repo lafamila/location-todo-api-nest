@@ -94,6 +94,11 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
             error: "No active session is connected for the target device",
           };
     }
+    if (!delivery.ok) {
+      this.logger.warn(
+        `delivery failed outbox=${claimed.id} device=${claimed.device_id} platform=${claimed.platform} attempt=${claimed.attempt_count + 1} code=${delivery.code ?? "UNKNOWN"} status=${delivery.status ?? "none"}`,
+      );
+    }
     await this.db.transaction(async (query) => {
       const attempt = claimed.attempt_count + 1;
       await query(

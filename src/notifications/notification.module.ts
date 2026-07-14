@@ -17,6 +17,6 @@ import { TriggerService } from "./trigger.service";
     OutboxWorkerService,
   ],
   controllers: [NotificationController],
-  exports: [TriggerService, DueWorkerService, OutboxWorkerService],
+  exports: [TriggerService, DueWorkerService, OutboxWorkerService, FcmService],
 })
 export class NotificationModule {}
