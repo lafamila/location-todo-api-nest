@@ -102,70 +102,89 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <header>
-        <div className="brand">
-          <span>L</span>
-          <strong>Location Todo</strong>
-        </div>
-        <div className="account-line">
-          <span>{account.displayName}</span>
-          <span className="permission">{account.permission}</span>
-          <button className="quiet" onClick={() => void logout()}>
-            로그아웃
-          </button>
-        </div>
-      </header>
-      <nav aria-label="관리 화면">
-        {(["todos", "geofences", "inbox", "devices"] as Tab[]).map((item) => (
-          <button
-            key={item}
-            className={tab === item ? "active" : ""}
-            onClick={() => setTab(item)}
-          >
-            {
+      <aside className="app-sidebar">
+        <header>
+          <div className="brand">
+            <span>L</span>
+            <strong>todo.</strong>
+          </div>
+          <div className="account-line">
+            <span>{account.displayName}</span>
+            <span className="permission">{account.permission}</span>
+          </div>
+        </header>
+        <nav aria-label="관리 화면">
+          {(["todos", "geofences", "inbox", "devices"] as Tab[]).map((item) => (
+            <button
+              key={item}
+              className={tab === item ? "active" : ""}
+              onClick={() => {
+                setTab(item);
+                window.scrollTo({ top: 0 });
+              }}
+            >
+              <span className="nav-icon" aria-hidden="true">
+                {
+                  {
+                    todos: "✓",
+                    geofences: "⌖",
+                    inbox: "□",
+                    devices: "⚙",
+                  }[item]
+                }
+              </span>
               {
-                todos: "TODO",
-                geofences: "저장 위치",
-                inbox: "알림함",
-                devices: "기기",
-              }[item]
-            }
-          </button>
-        ))}
-      </nav>
-      {error && (
-        <div className="error-banner" role="alert">
-          {error}
-        </div>
-      )}
-      {quota && (
-        <QuotaStrip quota={quota} onError={setError} onReload={reload} />
-      )}
-      <main>
-        {tab === "todos" && (
-          <TodoPanel
-            todos={todos}
-            deleted={deletedTodos}
-            geofences={geofences}
-            onReload={reload}
-            onError={(reason) => setError(actionMessage(reason))}
-          />
+                {
+                  todos: "TODO",
+                  geofences: "저장 위치",
+                  inbox: "알림함",
+                  devices: "기기",
+                }[item]
+              }
+            </button>
+          ))}
+        </nav>
+        <button className="sidebar-logout quiet" onClick={() => void logout()}>
+          로그아웃
+        </button>
+      </aside>
+      <div className="app-workspace">
+        {error && (
+          <div className="error-banner" role="alert">
+            {error}
+          </div>
         )}
-        {tab === "geofences" && (
-          <GeofencePanel
-            geofences={geofences}
-            deleted={deletedGeofences}
-            onReload={reload}
-            onError={(reason) => setError(actionMessage(reason))}
-          />
+        {quota && (
+          <QuotaStrip quota={quota} onError={setError} onReload={reload} />
         )}
-        {tab === "inbox" && (
-          <InboxPanel onError={(reason) => setError(actionMessage(reason))} />
-        )}
-        {tab === "devices" && (
-          <DevicePanel onError={(reason) => setError(actionMessage(reason))} />
-        )}
-      </main>
+        <main>
+          {tab === "todos" && (
+            <TodoPanel
+              todos={todos}
+              deleted={deletedTodos}
+              geofences={geofences}
+              onReload={reload}
+              onError={(reason) => setError(actionMessage(reason))}
+            />
+          )}
+          {tab === "geofences" && (
+            <GeofencePanel
+              geofences={geofences}
+              deleted={deletedGeofences}
+              onReload={reload}
+              onError={(reason) => setError(actionMessage(reason))}
+            />
+          )}
+          {tab === "inbox" && (
+            <InboxPanel onError={(reason) => setError(actionMessage(reason))} />
+          )}
+          {tab === "devices" && (
+            <DevicePanel
+              onError={(reason) => setError(actionMessage(reason))}
+            />
+          )}
+        </main>
+      </div>
     </div>
   );
 }
@@ -259,7 +278,8 @@ function TodoPanel({
     <section>
       <div className="section-heading">
         <div>
-          <h1>TODO</h1>
+          <p className="eyebrow">CONTEXTUAL REMINDERS</p>
+          <h1>알림</h1>
           <p>시간 또는 위치 조건별 활성 상태를 관리합니다.</p>
         </div>
         <button
@@ -284,105 +304,103 @@ function TodoPanel({
           onError={onError}
         />
       )}
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>내용</th>
-              <th>종류</th>
-              <th>반복</th>
-              <th>다음 조건</th>
-              <th>상태</th>
-              <th>
-                <span className="sr-only">작업</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {todos.map((todo) => (
-              <tr key={todo.id}>
-                <td>
-                  <strong>{todo.content}</strong>
-                  {todo.geofenceIds.length > 0 && (
-                    <small>
-                      {todo.geofenceIds
-                        .map((id) => geofences.find((g) => g.id === id)?.name)
-                        .filter(Boolean)
-                        .join(" OR ")}
-                    </small>
-                  )}
-                </td>
-                <td>{todo.geofenceIds.length === 0 ? "시간" : "위치"}</td>
-                <td>{todo.recurrence.type}</td>
-                <td>
+      <div className="todo-grid">
+        {todos.map((todo) => (
+          <article className="todo-card" key={todo.id}>
+            <button
+              className={`todo-status ${todo.active ? "active" : ""}`}
+              aria-label={todo.active ? "활성 TODO" : "비활성 TODO"}
+              onClick={() =>
+                void command(`/todos/${todo.id}/active`, {
+                  active: !todo.active,
+                  version: todo.version,
+                })
+              }
+            >
+              {todo.active ? "✓" : ""}
+            </button>
+            <div className="todo-content">
+              <div className="todo-title-row">
+                <h2>{todo.content}</h2>
+                <span className={`state state-${todo.active ? "on" : "off"}`}>
+                  {todo.lifecycleStatus}
+                </span>
+              </div>
+              <div className="todo-meta">
+                <span>{todo.geofenceIds.length === 0 ? "시간" : "위치"}</span>
+                <span>{todo.recurrence.type}</span>
+                <span>
                   {todo.nextOccurrenceAt
                     ? new Date(todo.nextOccurrenceAt).toLocaleString()
                     : (todo.triggerCondition?.type ?? "-")}
-                </td>
-                <td>
-                  <span className={`state state-${todo.active ? "on" : "off"}`}>
-                    {todo.lifecycleStatus}
-                  </span>
-                </td>
-                <td className="row-actions">
+                </span>
+              </div>
+              {todo.geofenceIds.length > 0 && (
+                <p className="todo-places">
+                  {todo.geofenceIds
+                    .map((id) => geofences.find((g) => g.id === id)?.name)
+                    .filter(Boolean)
+                    .join(" OR ")}
+                </p>
+              )}
+              <div className="row-actions">
+                <button
+                  onClick={() => {
+                    setEditing(todo);
+                    setShowForm(true);
+                  }}
+                >
+                  편집
+                </button>
+                {["COMPLETED", "TRIGGERED"].includes(todo.lifecycleStatus) ? (
                   <button
-                    onClick={() => {
-                      setEditing(todo);
-                      setShowForm(true);
-                    }}
+                    onClick={() =>
+                      void command(`/todos/${todo.id}/reactivate`, {
+                        version: todo.version,
+                      })
+                    }
                   >
-                    편집
+                    재활성화
                   </button>
-                  {["COMPLETED", "TRIGGERED"].includes(todo.lifecycleStatus) ? (
+                ) : (
+                  <>
                     <button
                       onClick={() =>
-                        void command(`/todos/${todo.id}/reactivate`, {
+                        void command(`/todos/${todo.id}/active`, {
+                          active: !todo.active,
                           version: todo.version,
                         })
                       }
                     >
-                      재활성화
+                      {todo.active ? "비활성" : "활성"}
                     </button>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() =>
-                          void command(`/todos/${todo.id}/active`, {
-                            active: !todo.active,
-                            version: todo.version,
-                          })
-                        }
-                      >
-                        {todo.active ? "비활성" : "활성"}
-                      </button>
-                      <button
-                        onClick={() =>
-                          void command(`/todos/${todo.id}/complete`, {
-                            version: todo.version,
-                          })
-                        }
-                      >
-                        완료
-                      </button>
-                    </>
-                  )}
-                  <button
-                    className="danger"
-                    onClick={() =>
-                      void command(
-                        `/todos/${todo.id}`,
-                        { version: todo.version },
-                        "DELETE",
-                      )
-                    }
-                  >
-                    삭제
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    <button
+                      onClick={() =>
+                        void command(`/todos/${todo.id}/complete`, {
+                          version: todo.version,
+                        })
+                      }
+                    >
+                      완료
+                    </button>
+                  </>
+                )}
+                <button
+                  className="danger"
+                  onClick={() =>
+                    void command(
+                      `/todos/${todo.id}`,
+                      { version: todo.version },
+                      "DELETE",
+                    )
+                  }
+                >
+                  삭제
+                </button>
+              </div>
+            </div>
+          </article>
+        ))}
         {!todos.length && <Empty text="등록된 TODO가 없습니다." />}
       </div>
       {!!deleted.length && (
@@ -765,6 +783,7 @@ function GeofencePanel({
     <section>
       <div className="section-heading">
         <div>
+          <p className="eyebrow">SAVED GEOFENCES</p>
           <h1>저장 위치</h1>
           <p>모바일 감지에 사용할 반경을 관리합니다.</p>
         </div>
