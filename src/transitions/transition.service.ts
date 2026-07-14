@@ -20,7 +20,6 @@ import {
 
 interface CandidateRow {
   id: string;
-  timezone: string;
   recurrence_type: RecurrenceRuleDto["type"];
   recurrence_start_date: string | Date;
   recurrence_weekdays: number[];
@@ -191,10 +190,10 @@ export class TransitionService {
       };
     }
     const candidates = await query<CandidateRow>(
-      `select t.id,t.timezone,t.recurrence_type,t.recurrence_start_date,t.recurrence_weekdays,t.recurrence_month_days,
+      `select t.id,t.recurrence_type,t.recurrence_start_date,t.recurrence_weekdays,t.recurrence_month_days,
        t.trigger_type,t.trigger_minutes,t.activation_generation,t.activated_at
        from todos t join todo_geofences tg on tg.todo_id=t.id
-       where tg.geofence_id=$1 and t.account_id=$2 and t.kind='LOCATION' and t.deleted_at is null and t.active
+       where tg.geofence_id=$1 and t.account_id=$2 and t.deleted_at is null and t.active
        and t.lifecycle_status in ('ACTIVE','TRIGGERED') for update of t`,
       [event.geofenceId, session.account.id],
     );
@@ -336,7 +335,6 @@ export class TransitionService {
     const occurrence = occurrenceForObservedDate(
       recurrence,
       new Date(event.observedAt),
-      todo.timezone,
       recurrence.type === "ONCE"
         ? {
             openEnded: fixedDates.length === 0 || hasUndatedWindow,
@@ -348,7 +346,6 @@ export class TransitionService {
     if (
       !scheduleEligible(
         new Date(event.observedAt),
-        todo.timezone,
         windows.rows.map((window) => ({
           date: window.local_date ? dateString(window.local_date) : null,
           startTime: window.start_time.slice(0, 5),

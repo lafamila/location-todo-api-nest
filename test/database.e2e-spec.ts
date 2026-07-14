@@ -137,8 +137,6 @@ describe("PostgreSQL authority integration", () => {
     for (let index = 0; index < 5; index += 1) {
       await todos.create(account, {
         content: `Time ${index}`,
-        kind: "TIME",
-        timezone: "UTC",
         recurrence: { type: "DAILY", startDate: "2020-01-01" },
         localTime: "23:59",
       });
@@ -146,6 +144,50 @@ describe("PostgreSQL authority integration", () => {
     const result = await quota.get(account);
     expect(result.timeTodos).toEqual({ used: 5, limit: null });
     expect(result.locationTodos).toEqual({ used: 0, limit: 3 });
+  });
+
+  test("derives reminder behavior from saved places and supports conversion", async () => {
+    const account = await seedAccount(db, "user");
+    const time = await todos.create(account, {
+      content: "Morning reminder",
+      recurrence: { type: "DAILY", startDate: "2020-01-01" },
+      localTime: "09:00",
+      geofenceIds: [],
+    });
+    expect(time).not.toHaveProperty("kind");
+    expect(time).not.toHaveProperty("timezone");
+    expect(time.geofenceIds).toEqual([]);
+
+    const geofence = await geofences.create(account, {
+      name: "Home",
+      address: "Seoul",
+      latitude: 37.5,
+      longitude: 127,
+      radiusMeters: 200,
+    });
+    const location = await todos.update(account, time.id, {
+      content: "Arrive home",
+      recurrence: { type: "DAILY", startDate: "2020-01-01" },
+      triggerCondition: { type: "ENTRY_IMMEDIATE" },
+      geofenceIds: [geofence.id],
+      version: time.version,
+    });
+    expect(location.localTime).toBeNull();
+    expect(location.geofenceIds).toEqual([geofence.id]);
+    expect((await quota.get(account)).locationTodos.used).toBe(1);
+
+    const converted = await todos.update(account, time.id, {
+      content: "Evening reminder",
+      recurrence: { type: "DAILY", startDate: "2020-01-01" },
+      localTime: "18:00",
+      geofenceIds: [],
+      version: location.version,
+    });
+    expect(converted.localTime).toBe("18:00");
+    expect(converted.geofenceIds).toEqual([]);
+    const quotas = await quota.get(account);
+    expect(quotas.locationTodos.used).toBe(0);
+    expect(quotas.timeTodos.used).toBe(1);
   });
 
   test("requires outside before entry, ACKs replay, and emits one event across two devices", async () => {
@@ -159,8 +201,6 @@ describe("PostgreSQL authority integration", () => {
     });
     const todo = await todos.create(account, {
       content: "Arrive at office",
-      kind: "LOCATION",
-      timezone: "UTC",
       recurrence: { type: "DAILY", startDate: "2020-01-01" },
       triggerCondition: { type: "ENTRY_IMMEDIATE" },
       geofenceIds: [geofence.id],
@@ -218,8 +258,8 @@ describe("PostgreSQL authority integration", () => {
     const todoId = randomUUID();
     const occurrenceId = randomUUID();
     await db.query(
-      `insert into todos(id,account_id,content,kind,timezone,recurrence_type,recurrence_start_date,local_time)
-       values($1,$2,'Overdue','TIME','UTC','ONCE','2020-01-01','09:00')`,
+      `insert into todos(id,account_id,content,recurrence_type,recurrence_start_date,local_time)
+       values($1,$2,'Overdue','ONCE','2020-01-01','09:00')`,
       [todoId, account.id],
     );
     await db.query(
@@ -251,8 +291,6 @@ describe("PostgreSQL authority integration", () => {
     });
     const todo = await todos.create(account, {
       content: "Stay at cafe",
-      kind: "LOCATION",
-      timezone: "UTC",
       recurrence: { type: "DAILY", startDate: "2020-01-01" },
       triggerCondition: { type: "DWELL", dwellMinutes: 10 },
       geofenceIds: [geofence.id],
@@ -304,8 +342,6 @@ describe("PostgreSQL authority integration", () => {
     });
     const todo = await todos.create(account, {
       content: "Leave station",
-      kind: "LOCATION",
-      timezone: "UTC",
       recurrence: { type: "DAILY", startDate: "2020-01-01" },
       triggerCondition: { type: "ENTRY_DELAYED", delayMinutes: 1 },
       geofenceIds: [geofence.id],
@@ -385,8 +421,6 @@ describe("PostgreSQL authority integration", () => {
     });
     await todos.create(account, {
       content: "Mobile only",
-      kind: "LOCATION",
-      timezone: "UTC",
       recurrence: { type: "DAILY", startDate: "2020-01-01" },
       triggerCondition: { type: "ENTRY_IMMEDIATE" },
       geofenceIds: [geofence.id],
@@ -459,8 +493,6 @@ describe("PostgreSQL authority integration", () => {
     });
     const todo = await todos.create(account, {
       content: "Replay authority",
-      kind: "LOCATION",
-      timezone: "UTC",
       recurrence: { type: "DAILY", startDate: "2020-01-01" },
       triggerCondition: { type: "ENTRY_IMMEDIATE" },
       geofenceIds: [geofence.id],
@@ -540,8 +572,6 @@ describe("PostgreSQL authority integration", () => {
     });
     const todo = await todos.create(account, {
       content: "Activation boundary",
-      kind: "LOCATION",
-      timezone: "UTC",
       recurrence: { type: "DAILY", startDate: "2020-01-01" },
       triggerCondition: { type: "ENTRY_IMMEDIATE" },
       geofenceIds: [geofence.id],
@@ -589,8 +619,6 @@ describe("PostgreSQL authority integration", () => {
     });
     const todo = await todos.create(account, {
       content: "Before edit",
-      kind: "LOCATION",
-      timezone: "UTC",
       recurrence: { type: "DAILY", startDate: "2020-01-01" },
       triggerCondition: { type: "ENTRY_IMMEDIATE" },
       geofenceIds: [geofence.id],
@@ -599,8 +627,6 @@ describe("PostgreSQL authority integration", () => {
     await delay(5);
     await todos.update(account, todo.id, {
       content: "After edit",
-      kind: "LOCATION",
-      timezone: "UTC",
       recurrence: { type: "DAILY", startDate: "2020-01-01" },
       triggerCondition: { type: "ENTRY_IMMEDIATE" },
       geofenceIds: [geofence.id],
@@ -631,8 +657,6 @@ describe("PostgreSQL authority integration", () => {
     });
     await todos.create(account, {
       content: "Geofence edit boundary",
-      kind: "LOCATION",
-      timezone: "UTC",
       recurrence: { type: "DAILY", startDate: "2020-01-01" },
       triggerCondition: { type: "ENTRY_IMMEDIATE" },
       geofenceIds: [geofence.id],
@@ -672,8 +696,6 @@ describe("PostgreSQL authority integration", () => {
     });
     const todo = await todos.create(account, {
       content: "Race authority",
-      kind: "LOCATION",
-      timezone: "UTC",
       recurrence: { type: "DAILY", startDate: "2020-01-01" },
       triggerCondition: { type: "ENTRY_IMMEDIATE" },
       geofenceIds: [geofence.id],
@@ -727,8 +749,6 @@ describe("PostgreSQL authority integration", () => {
       .slice(0, 10);
     const todo = await todos.create(account, {
       content: "Open once",
-      kind: "LOCATION",
-      timezone: "UTC",
       recurrence: { type: "ONCE", startDate: "2020-01-01" },
       triggerCondition: { type: "ENTRY_IMMEDIATE" },
       geofenceIds: [geofence.id],
@@ -774,8 +794,6 @@ describe("PostgreSQL authority integration", () => {
     });
     const todo = await todos.create(account, {
       content: "Needs geofence",
-      kind: "LOCATION",
-      timezone: "UTC",
       recurrence: { type: "DAILY", startDate: "2020-01-01" },
       triggerCondition: { type: "ENTRY_IMMEDIATE" },
       geofenceIds: [geofence.id],
@@ -801,8 +819,6 @@ describe("PostgreSQL authority integration", () => {
     });
     const todo = await todos.create(account, {
       content: "Concurrent activation",
-      kind: "LOCATION",
-      timezone: "UTC",
       recurrence: { type: "DAILY", startDate: "2020-01-01" },
       triggerCondition: { type: "ENTRY_IMMEDIATE" },
       geofenceIds: [geofence.id],
@@ -835,8 +851,6 @@ describe("PostgreSQL authority integration", () => {
     });
     const todo = await todos.create(account, {
       content: "Delayed reactivation",
-      kind: "LOCATION",
-      timezone: "UTC",
       recurrence: { type: "DAILY", startDate: "2020-01-01" },
       triggerCondition: { type: "ENTRY_DELAYED", delayMinutes: 10 },
       geofenceIds: [geofence.id],
@@ -868,17 +882,15 @@ describe("PostgreSQL authority integration", () => {
     await expect(
       todos.update(account, daily.id, {
         content: "Past once",
-        kind: "TIME",
-        timezone: "UTC",
         recurrence: { type: "ONCE", startDate: "2020-01-01" },
         localTime: "09:00",
         version: daily.version,
       }),
     ).rejects.toMatchObject({ status: 400 });
     const terminal = await db.query<{ id: string }>(
-      `insert into todos(account_id,content,kind,timezone,recurrence_type,recurrence_start_date,local_time,
+      `insert into todos(account_id,content,recurrence_type,recurrence_start_date,local_time,
        active,lifecycle_status,last_triggered_at)
-       values($1,'Past triggered','TIME','UTC','ONCE','2020-01-01','09:00',false,'TRIGGERED',now()) returning id`,
+       values($1,'Past triggered','ONCE','2020-01-01','09:00',false,'TRIGGERED',now()) returning id`,
       [account.id],
     );
     await expect(
@@ -1302,8 +1314,8 @@ describe("PostgreSQL authority integration", () => {
   test("keeps elapsed one-time TODOs inactive until their schedule is edited", async () => {
     const account = await seedAccount(db, "user");
     const result = await db.query<{ id: string }>(
-      `insert into todos(account_id,content,kind,timezone,recurrence_type,recurrence_start_date,local_time,active,lifecycle_status)
-       values($1,'Elapsed once','TIME','UTC','ONCE','2020-01-01','00:00',false,'INACTIVE') returning id`,
+      `insert into todos(account_id,content,recurrence_type,recurrence_start_date,local_time,active,lifecycle_status)
+       values($1,'Elapsed once','ONCE','2020-01-01','00:00',false,'INACTIVE') returning id`,
       [account.id],
     );
     await expect(
@@ -1502,8 +1514,6 @@ function delay(milliseconds: number): Promise<void> {
 function timeTodoInput(content: string) {
   return {
     content,
-    kind: "TIME" as const,
-    timezone: "UTC",
     recurrence: { type: "DAILY" as const, startDate: "2020-01-01" },
     localTime: "23:59",
   };
@@ -1546,17 +1556,30 @@ async function seedQuotaRows(
   locationCount: number,
   geofenceCount: number,
 ): Promise<void> {
+  const classificationGeofence = await db.query<{ id: string }>(
+    `insert into saved_geofences(account_id,name,address,latitude,longitude,radius_meters,deleted_at)
+     values($1,'Classification only','Seoul',37.5,127,100,now()) returning id`,
+    [accountId],
+  );
   for (let index = 0; index < locationCount; index += 1) {
-    await db.query(
-      `insert into todos(account_id,content,kind,timezone,recurrence_type,recurrence_start_date,trigger_type,active)
-       values($1,$2,'LOCATION','UTC','DAILY','2020-01-01','ENTRY_IMMEDIATE',$3)`,
+    const todo = await db.query<{ id: string }>(
+      `insert into todos(account_id,content,recurrence_type,recurrence_start_date,trigger_type,active)
+       values($1,$2,'DAILY','2020-01-01','ENTRY_IMMEDIATE',$3) returning id`,
       [accountId, `Location ${index}`, index % 2 === 0],
     );
+    await db.query(
+      `insert into todo_geofences(todo_id,geofence_id) values($1,$2)`,
+      [todo.rows[0]!.id, classificationGeofence.rows[0]!.id],
+    );
   }
-  await db.query(
-    `insert into todos(account_id,content,kind,timezone,recurrence_type,recurrence_start_date,trigger_type,deleted_at)
-     values($1,'Deleted location','LOCATION','UTC','DAILY','2020-01-01','ENTRY_IMMEDIATE',now())`,
+  const deletedTodo = await db.query<{ id: string }>(
+    `insert into todos(account_id,content,recurrence_type,recurrence_start_date,trigger_type,deleted_at)
+     values($1,'Deleted location','DAILY','2020-01-01','ENTRY_IMMEDIATE',now()) returning id`,
     [accountId],
+  );
+  await db.query(
+    `insert into todo_geofences(todo_id,geofence_id) values($1,$2)`,
+    [deletedTodo.rows[0]!.id, classificationGeofence.rows[0]!.id],
   );
   for (let index = 0; index < geofenceCount; index += 1) {
     await db.query(
@@ -1575,8 +1598,8 @@ async function seedNotification(
   const todoId = randomUUID();
   const occurrenceId = randomUUID();
   await db.query(
-    `insert into todos(id,account_id,content,kind,timezone,recurrence_type,recurrence_start_date,local_time)
-     values($1,$2,'Inbox event','TIME','UTC','ONCE','2026-07-13','17:30')`,
+    `insert into todos(id,account_id,content,recurrence_type,recurrence_start_date,local_time)
+     values($1,$2,'Inbox event','ONCE','2026-07-13','17:30')`,
     [todoId, accountId],
   );
   await db.query(

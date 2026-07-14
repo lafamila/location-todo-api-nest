@@ -28,8 +28,10 @@ export class QuotaService {
       upgrade_status: string | null;
     }>(
       `select
-        (select count(*)::int from todos where account_id=$1 and kind='LOCATION' and deleted_at is null) location_count,
-        (select count(*)::int from todos where account_id=$1 and kind='TIME' and deleted_at is null) time_count,
+        (select count(*)::int from todos t where t.account_id=$1 and t.deleted_at is null
+          and exists(select 1 from todo_geofences tg where tg.todo_id=t.id)) location_count,
+        (select count(*)::int from todos t where t.account_id=$1 and t.deleted_at is null
+          and not exists(select 1 from todo_geofences tg where tg.todo_id=t.id)) time_count,
         (select count(*)::int from saved_geofences where account_id=$1 and deleted_at is null) geofence_count,
         (select upgrade_status from accounts where id=$1) upgrade_status`,
       [account.id],

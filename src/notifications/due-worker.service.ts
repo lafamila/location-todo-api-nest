@@ -26,7 +26,6 @@ interface JobRow {
   recurrence_start_date: string | Date;
   recurrence_weekdays: number[];
   recurrence_month_days: number[];
-  timezone: string;
   local_time: string | null;
 }
 
@@ -74,7 +73,7 @@ export class DueWorkerService implements OnModuleInit, OnModuleDestroy {
       const result = await query<JobRow>(
         `select j.id,j.occurrence_id,j.kind,j.due_at,j.device_id,j.geofence_id,t.id todo_id,t.active,t.deleted_at,
          t.lifecycle_status,t.activation_generation,t.recurrence_type,t.recurrence_start_date,t.recurrence_weekdays,
-         t.recurrence_month_days,t.timezone,t.local_time
+         t.recurrence_month_days,t.local_time
          from due_jobs j join todo_occurrences o on o.id=j.occurrence_id join todos t on t.id=o.todo_id
          where j.id=$1 and j.status='PENDING' for update of j`,
         [candidateId],
@@ -169,12 +168,7 @@ export class DueWorkerService implements OnModuleInit, OnModuleDestroy {
       weekdays: job.recurrence_weekdays,
       monthDays: job.recurrence_month_days,
     };
-    const next = nextOccurrence(
-      rule,
-      job.local_time!.slice(0, 5),
-      job.timezone,
-      job.due_at,
-    );
+    const next = nextOccurrence(rule, job.local_time!.slice(0, 5), job.due_at);
     if (!next) return;
     const occurrence = await query<{ id: string }>(
       `insert into todo_occurrences(todo_id,occurrence_key,due_at) values($1,$2,$3)

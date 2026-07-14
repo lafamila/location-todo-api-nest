@@ -94,9 +94,9 @@ Flutter client는 감지 evidence와 UI intent를 보내며 trigger authority가
 5. Kakao address/keyword search proxy는 server REST key를 사용하고 request rate/size를 제한한다.
 6. map handoff endpoint는 one-time id, account/session binding, short TTL, allowed origin을 검증한다.
 
-### 6. TODO kind, recurrence, schedule, relation, lifecycle APIs
+### 6. TODO recurrence, schedule, relation, lifecycle APIs
 
-1. content, `LOCATION | TIME` kind, timezone, recurrence, active/lifecycle 상태를 validation한다.
+1. content, recurrence, active/lifecycle 상태를 validation하고 `geofenceIds`가 비었으면 시간 TODO, 하나 이상이면 위치 TODO로 파생한다. 시간대는 `Asia/Seoul`로 고정한다.
 2. 공통 recurrence rule을 저장하고 future occurrence를 계산한다.
    - `ONCE`: time TODO는 local date/time 필수
    - `DAILY`: startDate 이후 매일
@@ -124,7 +124,7 @@ Flutter client는 감지 evidence와 UI intent를 보내며 trigger authority가
 3. due 시각을 지나 server가 복구되면 아직 유효한 occurrence를 expiry 없이 즉시 발행한다.
 4. 반복 occurrence trigger는 series를 active로 유지하고 다음 occurrence를 같은 transaction에서 예약한다.
 5. inactive 기간 occurrence는 backfill하지 않고 reactivation 이후 future occurrence만 예약한다.
-6. recurrence 수정과 timezone 변경은 future jobs만 재계산하고 emitted occurrence는 보존한다.
+6. recurrence 수정은 future jobs만 재계산하고 emitted occurrence는 보존한다.
 
 ### 8. Transition batch and state machine
 
@@ -133,7 +133,7 @@ Flutter client는 감지 evidence와 UI intent를 보내며 trigger authority가
 3. observed time, accuracy, transition만 저장하고 raw route를 금지한다.
 4. device/geofence state를 unknown/inside/outside/armed로 모델링한다.
 5. create/reactivate while inside는 trigger하지 않고 outside 후 re-entry만 인정한다.
-6. schedule eligibility를 TODO timezone과 observed entry time으로 평가한다.
+6. schedule eligibility를 `Asia/Seoul`과 observed entry time으로 평가한다.
 7. inactive/completed/deleted state와 이미 발행된 occurrence는 late offline event보다 우선한다.
 8. offline batch의 enter/exit 순서를 먼저 적용한 뒤 dwell evidence를 판정한다.
 9. 반복 location TODO는 occurrence마다 한 번만 trigger하고, 다음 occurrence도 fresh outside -> inside가 있어야 한다. 계속 inside인 상태의 calendar rollover는 trigger하지 않는다.
@@ -164,9 +164,9 @@ Flutter client는 감지 evidence와 UI intent를 보내며 trigger authority가
 2. login/session, permission/quota, upgrade request 상태를 제공한다.
 3. saved geofence CRUD와 휴지통/복원을 구현한다.
 4. `/map-picker`에서 Kakao search, draggable marker, numeric radius, visible circle을 동기화한다.
-5. TODO editor는 location/time kind selector와 `ONCE/DAILY/WEEKLY/MONTHLY` recurrence editor를 제공한다.
+5. TODO editor는 저장 위치 선택 여부로 시간/위치 입력을 자동 전환하고 `ONCE/DAILY/WEEKLY/MONTHLY` recurrence editor를 제공한다.
 6. location form은 multiple windows, multi-geofence OR, three trigger modes를 제공하고 time form은 주소 없이 exact date/time을 받는다.
-7. TODO list는 kind, recurrence, lifecycle, next occurrence/condition, geofences, monitoring state, trigger/complete/reactivate를 스캔 가능하게 표시한다.
+7. TODO list는 저장 위치에서 파생한 유형, recurrence, lifecycle, next occurrence/condition, geofences, monitoring state, trigger/complete/reactivate를 스캔 가능하게 표시한다.
 8. notification inbox와 device/session management를 구현한다.
 9. keyboard, focus, validation, mobile responsive behavior를 테스트한다.
 10. API error codes를 사용자 행동 가능한 상태로 매핑하고 secret/server detail을 표시하지 않는다.
@@ -192,7 +192,7 @@ Flutter client는 감지 evidence와 UI intent를 보내며 trigger authority가
 
 - session start/complete/header and native return transaction
 - device registration and active monitoring projection
-- geofence/TODO kind/recurrence/schedule DTOs and location quota error shape
+- geofence relation-derived TODO behavior, recurrence/schedule DTOs, and location quota error shape
 - transition batch event/ACK/idempotency shape
 - notification inbox cursor and realtime event envelope
 - map handoff request/result envelope

@@ -158,8 +158,8 @@ describe("HTTP authentication and ownership", () => {
       [owner],
     );
     const todo = await db.query<{ id: string }>(
-      `insert into todos(account_id,content,kind,timezone,recurrence_type,recurrence_start_date,local_time)
-       values($1,'Delete me','TIME','UTC','DAILY','2020-01-01','09:00') returning id`,
+      `insert into todos(account_id,content,recurrence_type,recurrence_start_date,local_time)
+       values($1,'Delete me','DAILY','2020-01-01','09:00') returning id`,
       [owner],
     );
     const occurrence = await db.query<{ id: string }>(
@@ -277,13 +277,13 @@ describe("HTTP authentication and ownership", () => {
       [owner],
     );
     const todo = await db.query<{ id: string }>(
-      `insert into todos(account_id,content,kind,timezone,recurrence_type,recurrence_start_date,local_time)
-       values($1,'Private','TIME','UTC','DAILY','2020-01-01','09:00') returning id`,
+      `insert into todos(account_id,content,recurrence_type,recurrence_start_date,local_time)
+       values($1,'Private','DAILY','2020-01-01','09:00') returning id`,
       [owner],
     );
     const deletedTodo = await db.query<{ id: string }>(
-      `insert into todos(account_id,content,kind,timezone,recurrence_type,recurrence_start_date,local_time,active,lifecycle_status,deleted_at)
-       values($1,'Deleted private','TIME','UTC','DAILY','2020-01-01','09:00',false,'INACTIVE',now()) returning id`,
+      `insert into todos(account_id,content,recurrence_type,recurrence_start_date,local_time,active,lifecycle_status,deleted_at)
+       values($1,'Deleted private','DAILY','2020-01-01','09:00',false,'INACTIVE',now()) returning id`,
       [owner],
     );
     const device = await db.query<{ id: string }>(
@@ -461,8 +461,6 @@ async function seedHttpSession(
 function timeTodo(content: string) {
   return {
     content,
-    kind: "TIME",
-    timezone: "UTC",
     recurrence: { type: "DAILY", startDate: "2020-01-01" },
     localTime: "09:00",
   };
@@ -473,8 +471,8 @@ async function seedHttpNotification(
   accountId: string,
 ): Promise<string> {
   const todo = await db.query<{ id: string }>(
-    `insert into todos(account_id,content,kind,timezone,recurrence_type,recurrence_start_date,local_time)
-     values($1,'Notification','TIME','UTC','ONCE','2026-07-13','09:00') returning id`,
+    `insert into todos(account_id,content,recurrence_type,recurrence_start_date,local_time)
+     values($1,'Notification','ONCE','2026-07-13','09:00') returning id`,
     [accountId],
   );
   const occurrence = await db.query<{ id: string }>(

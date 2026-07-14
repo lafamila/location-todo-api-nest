@@ -1,7 +1,5 @@
 {
   "content": "Buy groceries",
-  "kind": "LOCATION",
-  "timezone": "Asia/Seoul",
   "recurrence": {
     "type": "WEEKLY",
     "startDate": "2026-07-13",

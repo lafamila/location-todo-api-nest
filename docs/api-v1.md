@@ -22,7 +22,7 @@ All paths are under `/api`. Browser mutations require the HttpOnly session cooki
 - TODO lifecycle: `POST /todos/:id/active`, `/complete`, `/reactivate`, `/restore`; delete is `DELETE /todos/:id`.
 - Geofence delete rejects `GEOFENCE_IN_USE`; restore consumes quota.
 
-The recurrence and trigger discriminated unions are declared in `src/contracts/v1.ts`. `TIME` accepts `localTime` and rejects location fields. `LOCATION` accepts one or more `geofenceIds`, optional non-cross-midnight windows, and one of immediate/delayed/dwell.
+The recurrence and trigger discriminated unions are declared in `src/contracts/v1.ts`. TODOs do not expose a `kind` or `timezone` field. An empty `geofenceIds` array means a time reminder and requires `localTime`; one or more IDs mean a location reminder and require one of immediate/delayed/dwell plus optional non-cross-midnight windows. All calendar evaluation uses `Asia/Seoul`.
 
 ## Transition And Delivery
 
@@ -52,4 +52,4 @@ The server derives `accountId` and `draftNonce` from the bound, five-minute, one
 }
 ```
 
-Stable codes include `AUTH_REQUIRED`, `SESSION_EXPIRED`, `CSRF_INVALID`, `VALIDATION_ERROR`, `QUOTA_EXCEEDED`, `VERSION_CONFLICT`, `TODO_NOT_FOUND`, `GEOFENCE_NOT_FOUND`, `GEOFENCE_IN_USE`, `HANDOFF_EXPIRED`, `RATE_LIMITED`, and transient `AUTH_UNAVAILABLE`/`KAKAO_UNAVAILABLE`.
+Stable codes include `AUTH_REQUIRED`, `SESSION_EXPIRED`, `CSRF_INVALID`, `VALIDATION_ERROR`, `TODO_FIELD_MISMATCH`, `QUOTA_EXCEEDED`, `VERSION_CONFLICT`, `TODO_NOT_FOUND`, `GEOFENCE_NOT_FOUND`, `GEOFENCE_IN_USE`, `HANDOFF_EXPIRED`, `RATE_LIMITED`, and transient `AUTH_UNAVAILABLE`/`KAKAO_UNAVAILABLE`.

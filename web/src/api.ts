@@ -28,8 +28,6 @@ export interface Geofence {
 export interface Todo {
   id: string;
   content: string;
-  kind: "LOCATION" | "TIME";
-  timezone: string;
   recurrence: {
     type: string;
     startDate: string;

@@ -278,6 +278,11 @@ legend {
   font-size: 13px;
   font-weight: 700;
 }
+.field-note {
+  margin: 0 0 10px;
+  color: #65736c;
+  font-size: 13px;
+}
 .check-row {
   display: flex;
   gap: 14px;

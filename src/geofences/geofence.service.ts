@@ -111,7 +111,7 @@ export class GeofenceService {
         throw new ApiError("VERSION_CONFLICT", "Geofence version changed", 409);
       const linked = await query<{ id: string }>(
         `select t.id from todos t join todo_geofences tg on tg.todo_id=t.id
-         where tg.geofence_id=$1 and t.account_id=$2 and t.kind='LOCATION'
+         where tg.geofence_id=$1 and t.account_id=$2
          and t.active and t.deleted_at is null for update of t`,
         [id, accountId],
       );
@@ -245,7 +245,7 @@ export class GeofenceService {
   async projection(accountId: string): Promise<SavedGeofenceDto[]> {
     const result = await this.db.query<GeofenceRow>(
       `select distinct g.* from saved_geofences g join todo_geofences tg on tg.geofence_id=g.id join todos t on t.id=tg.todo_id
-       where g.account_id=$1 and g.deleted_at is null and t.deleted_at is null and t.active and t.kind='LOCATION'
+       where g.account_id=$1 and g.deleted_at is null and t.deleted_at is null and t.active
        and t.lifecycle_status in ('ACTIVE','TRIGGERED') order by g.updated_at desc`,
       [accountId],
     );

@@ -303,7 +303,7 @@ function TodoPanel({
               <tr key={todo.id}>
                 <td>
                   <strong>{todo.content}</strong>
-                  {todo.kind === "LOCATION" && (
+                  {todo.geofenceIds.length > 0 && (
                     <small>
                       {todo.geofenceIds
                         .map((id) => geofences.find((g) => g.id === id)?.name)
@@ -312,7 +312,7 @@ function TodoPanel({
                     </small>
                   )}
                 </td>
-                <td>{todo.kind === "TIME" ? "시간" : "위치"}</td>
+                <td>{todo.geofenceIds.length === 0 ? "시간" : "위치"}</td>
                 <td>{todo.recurrence.type}</td>
                 <td>
                   {todo.nextOccurrenceAt
@@ -423,16 +423,15 @@ function TodoForm({
   onSaved: () => Promise<void>;
   onError: (error: unknown) => void;
 }) {
-  const [timezone, setTimezone] = useState(todo?.timezone ?? "Asia/Seoul");
   const [startDate, setStartDate] = useState(
-    todo?.recurrence.startDate ?? localDateInTimezone(new Date(), timezone),
+    todo?.recurrence.startDate ?? localDateInSeoul(new Date()),
   );
-  const [kind, setKind] = useState<"TIME" | "LOCATION">(todo?.kind ?? "TIME");
   const [recurrence, setRecurrence] = useState(todo?.recurrence.type ?? "ONCE");
   const [trigger, setTrigger] = useState(
     todo?.triggerCondition?.type ?? "ENTRY_IMMEDIATE",
   );
   const [selected, setSelected] = useState<string[]>(todo?.geofenceIds ?? []);
+  const isLocation = selected.length > 0;
   const [windows, setWindows] = useState<
     Array<{ date: string; startTime: string; endTime: string }>
   >(
@@ -457,11 +456,10 @@ function TodoForm({
         .map(Number);
     const payload: Record<string, unknown> = {
       content: data.get("content"),
-      kind,
-      timezone: data.get("timezone"),
       recurrence: recurrenceValue,
+      geofenceIds: selected,
     };
-    if (kind === "TIME") payload.localTime = data.get("localTime");
+    if (!isLocation) payload.localTime = data.get("localTime");
     else {
       payload.geofenceIds = selected;
       payload.triggerCondition =
@@ -509,55 +507,16 @@ function TodoForm({
             required
           />
         </label>
-        <div className="segmented" role="group" aria-label="TODO 종류">
-          <button
-            type="button"
-            className={kind === "TIME" ? "selected" : ""}
-            disabled={Boolean(todo)}
-            onClick={() => setKind("TIME")}
-          >
-            시간
-          </button>
-          <button
-            type="button"
-            className={kind === "LOCATION" ? "selected" : ""}
-            disabled={Boolean(todo)}
-            onClick={() => setKind("LOCATION")}
-          >
-            위치
-          </button>
-        </div>
-        <div className="field-grid">
-          <label>
-            시간대
-            <input
-              name="timezone"
-              value={timezone}
-              onChange={(event) => {
-                const next = event.target.value;
-                setTimezone(next);
-                if (!todo) {
-                  try {
-                    setStartDate(localDateInTimezone(new Date(), next));
-                  } catch {
-                    // Keep the last valid default until the timezone is valid.
-                  }
-                }
-              }}
-              required
-            />
-          </label>
-          <label>
-            시작일
-            <input
-              type="date"
-              name="startDate"
-              value={startDate}
-              onChange={(event) => setStartDate(event.target.value)}
-              required
-            />
-          </label>
-        </div>
+        <label>
+          시작일
+          <input
+            type="date"
+            name="startDate"
+            value={startDate}
+            onChange={(event) => setStartDate(event.target.value)}
+            required
+          />
+        </label>
         <label>
           반복
           <select
@@ -601,7 +560,32 @@ function TodoForm({
             />
           </label>
         )}
-        {kind === "TIME" ? (
+        <fieldset>
+          <legend>저장 위치 (선택)</legend>
+          <p className="field-note">
+            선택하지 않으면 시간 알림으로 등록됩니다. 여러 위치는 OR 조건입니다.
+          </p>
+          <div className="check-column">
+            {geofences.map((geofence) => (
+              <label key={geofence.id}>
+                <input
+                  type="checkbox"
+                  checked={selected.includes(geofence.id)}
+                  onChange={() =>
+                    setSelected((current) =>
+                      current.includes(geofence.id)
+                        ? current.filter((id) => id !== geofence.id)
+                        : [...current, geofence.id],
+                    )
+                  }
+                />
+                {geofence.name}
+                <small>{geofence.address}</small>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        {!isLocation ? (
           <label>
             알림 시각
             <input
@@ -613,28 +597,6 @@ function TodoForm({
           </label>
         ) : (
           <>
-            <fieldset>
-              <legend>저장 위치 (OR)</legend>
-              <div className="check-column">
-                {geofences.map((geofence) => (
-                  <label key={geofence.id}>
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(geofence.id)}
-                      onChange={() =>
-                        setSelected((current) =>
-                          current.includes(geofence.id)
-                            ? current.filter((id) => id !== geofence.id)
-                            : [...current, geofence.id],
-                        )
-                      }
-                    />
-                    {geofence.name}
-                    <small>{geofence.address}</small>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
             <label>
               조건
               <select
@@ -765,9 +727,9 @@ function TodoForm({
   );
 }
 
-function localDateInTimezone(date: Date, timezone: string): string {
+function localDateInSeoul(date: Date): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
+    timeZone: "Asia/Seoul",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

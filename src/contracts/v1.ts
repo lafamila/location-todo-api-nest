@@ -1,6 +1,5 @@
 export type Permission = "visitor" | "user" | "superadmin";
 export type Platform = "ios" | "android" | "macos" | "windows" | "web";
-export type TodoKind = "LOCATION" | "TIME";
 export type RecurrenceType = "ONCE" | "DAILY" | "WEEKLY" | "MONTHLY";
 export type TodoLifecycle = "ACTIVE" | "INACTIVE" | "TRIGGERED" | "COMPLETED";
 
@@ -39,8 +38,6 @@ export interface SavedGeofenceDto {
 export interface TodoDto {
   id: string;
   content: string;
-  kind: TodoKind;
-  timezone: string;
   recurrence: RecurrenceRuleDto;
   localTime?: string | null;
   triggerCondition?: TriggerConditionDto | null;

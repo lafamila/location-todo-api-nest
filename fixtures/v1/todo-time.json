@@ -1,7 +1,5 @@
 {
   "content": "Submit weekly report",
-  "kind": "TIME",
-  "timezone": "Asia/Seoul",
   "recurrence": {
     "type": "WEEKLY",
     "startDate": "2026-07-13",

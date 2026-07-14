@@ -48,12 +48,12 @@ Location Todo의 NestJS API, OIDC BFF, PostgreSQL 위치·시간 recurrence pipe
 - Stack: NestJS 11, raw SQL + `pg`, PostgreSQL, React 19 + Vite SPA, Socket.IO-compatible realtime boundary.
 - The SPA lives under `web/`, builds into the Nest production artifact, and is served only outside `/api`.
 - PostgreSQL owns sessions, domain data, due jobs, durable outbox, notification inbox, delivery attempts, and idempotency.
-- TODO kind는 `LOCATION | TIME`이며 두 종류 모두 `ONCE/DAILY/WEEKLY/MONTHLY` recurrence를 공유한다. time TODO는 주소·지오펜스 없이 server due worker가 실행한다.
+- TODO는 kind 필드를 저장하거나 노출하지 않는다. `todo_geofences` 관계가 없으면 시간 TODO, 하나 이상이면 위치 TODO로 파생하며 두 유형 모두 `ONCE/DAILY/WEEKLY/MONTHLY` recurrence를 공유한다.
 - Exactly-once 경계는 series 전체가 아니라 `(todoId, occurrenceKey)`다. 반복 location TODO는 다음 회차에 fresh outside-to-inside가 필요하다.
 - Redis and Azure/WNS are excluded from the current plan.
 - Migrations are ordered SQL files with an explicit migration ledger; do not grow an ad hoc `CREATE TABLE IF NOT EXISTS` block in application startup.
 - API contract DTOs are the cross-repo source of truth. Flutter fixtures must be updated when contracts change.
-- All time is stored as `timestamptz`; user schedule evaluation uses the TODO IANA timezone.
+- All instants are stored as `timestamptz`; calendar and schedule evaluation is fixed to `Asia/Seoul` and no timezone field is accepted.
 - Raw continuous GPS coordinates and movement paths must never be persisted or logged.
 
 ## Structure Target

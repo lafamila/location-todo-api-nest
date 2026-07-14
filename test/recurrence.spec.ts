@@ -12,7 +12,6 @@ describe("recurrence authority", () => {
       nextOccurrence(
         { type: "DAILY", startDate: "2026-07-01" },
         "09:00",
-        "Asia/Seoul",
         new Date("2026-07-13T00:00:00.000Z"),
       ),
     ).toMatchObject({ occurrenceKey: "2026-07-14T09:00" });
@@ -21,7 +20,6 @@ describe("recurrence authority", () => {
       nextOccurrence(
         { type: "WEEKLY", startDate: "2026-07-01", weekdays: [1, 4] },
         "09:00",
-        "Asia/Seoul",
         new Date("2026-07-13T01:00:00.000Z"),
       ),
     ).toMatchObject({ occurrenceKey: "2026-07-16T09:00" });
@@ -30,25 +28,18 @@ describe("recurrence authority", () => {
       nextOccurrence(
         { type: "MONTHLY", startDate: "2026-01-01", monthDays: [31] },
         "12:00",
-        "UTC",
         new Date("2026-04-01T00:00:00.000Z"),
       ),
     ).toMatchObject({ occurrenceKey: "2026-05-31T12:00" });
   });
 
-  test("moves a DST gap to the next valid local time and picks the first overlap instant", () => {
+  test("converts the fixed Asia/Seoul local time to an instant", () => {
     expect(
-      localToInstant(
-        { date: "2026-03-08", time: "02:30" },
-        "America/New_York",
-      ).toISOString(),
-    ).toBe("2026-03-08T07:00:00.000Z");
+      localToInstant({ date: "2026-03-08", time: "02:30" }).toISOString(),
+    ).toBe("2026-03-07T17:30:00.000Z");
     expect(
-      localToInstant(
-        { date: "2026-11-01", time: "01:30" },
-        "America/New_York",
-      ).toISOString(),
-    ).toBe("2026-11-01T05:30:00.000Z");
+      localToInstant({ date: "2026-11-01", time: "09:00" }).toISOString(),
+    ).toBe("2026-11-01T00:00:00.000Z");
   });
 
   test("uses local recurrence dates for location observations", () => {
@@ -56,7 +47,6 @@ describe("recurrence authority", () => {
       occurrenceForObservedDate(
         { type: "WEEKLY", startDate: "2026-07-01", weekdays: [1] },
         new Date("2026-07-12T15:30:00.000Z"),
-        "Asia/Seoul",
       ),
     ).toEqual({ occurrenceKey: "2026-07-13", localDate: "2026-07-13" });
   });
@@ -64,31 +54,21 @@ describe("recurrence authority", () => {
   test("keeps undated ONCE location schedules open after their start date", () => {
     const rule = { type: "ONCE" as const, startDate: "2026-07-01" };
     expect(
-      occurrenceForObservedDate(
-        rule,
-        new Date("2026-07-13T10:00:00.000Z"),
-        "UTC",
-        { openEnded: true },
-      ),
+      occurrenceForObservedDate(rule, new Date("2026-07-13T10:00:00.000Z"), {
+        openEnded: true,
+      }),
     ).toEqual({ occurrenceKey: "ONCE", localDate: "2026-07-13" });
     expect(
-      occurrenceForObservedDate(
-        rule,
-        new Date("2026-07-13T10:00:00.000Z"),
-        "UTC",
-        { openEnded: false, fixedDates: ["2026-07-14"] },
-      ),
+      occurrenceForObservedDate(rule, new Date("2026-07-13T10:00:00.000Z"), {
+        openEnded: false,
+        fixedDates: ["2026-07-14"],
+      }),
     ).toBeNull();
     expect(
-      occurrenceForObservedDate(
-        rule,
-        new Date("2026-07-13T10:00:00.000Z"),
-        "UTC",
-        {
-          openEnded: true,
-          fixedDates: ["2026-07-14"],
-        },
-      ),
+      occurrenceForObservedDate(rule, new Date("2026-07-13T10:00:00.000Z"), {
+        openEnded: true,
+        fixedDates: ["2026-07-14"],
+      }),
     ).toEqual({ occurrenceKey: "ONCE", localDate: "2026-07-13" });
   });
 
@@ -98,18 +78,10 @@ describe("recurrence authority", () => {
       "DAILY",
     );
     expect(
-      scheduleEligible(
-        new Date("2026-07-13T14:00:00.000Z"),
-        "Asia/Seoul",
-        windows,
-      ),
+      scheduleEligible(new Date("2026-07-13T14:00:00.000Z"), windows),
     ).toBe(true);
     expect(
-      scheduleEligible(
-        new Date("2026-07-13T15:00:00.000Z"),
-        "Asia/Seoul",
-        windows,
-      ),
+      scheduleEligible(new Date("2026-07-13T15:00:00.000Z"), windows),
     ).toBe(false);
     expect(() =>
       validateWindows([{ startTime: "22:00", endTime: "02:00" }], "DAILY"),

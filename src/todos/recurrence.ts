@@ -6,19 +6,12 @@ export interface LocalDateTime {
   time: string;
 }
 
+export const TODO_TIMEZONE = "Asia/Seoul";
+
 interface DateParts {
   year: number;
   month: number;
   day: number;
-}
-
-export function validateTimezone(timezone: string): string {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format();
-    return timezone;
-  } catch {
-    throw new ApiError("VALIDATION_ERROR", "timezone must be an IANA timezone");
-  }
 }
 
 export function validateLocalDate(value: string, name = "date"): string {
@@ -94,13 +87,11 @@ function uniqueSorted(
 export function nextOccurrence(
   ruleInput: RecurrenceRuleDto,
   localTime: string,
-  timezone: string,
   after: Date,
 ): { occurrenceKey: string; dueAt: Date; localDate: string } | null {
   const rule = normalizeRule(ruleInput);
   validateLocalTime(localTime);
-  validateTimezone(timezone);
-  const afterLocal = zonedParts(after, timezone);
+  const afterLocal = zonedParts(after);
   const start = parseDate(rule.startDate);
   let cursor =
     compareDate(start, afterLocal.date) > 0 ? start : afterLocal.date;
@@ -108,7 +99,7 @@ export function nextOccurrence(
   while (compareDate(cursor, max) <= 0) {
     if (matchesRule(cursor, rule)) {
       const date = formatDate(cursor);
-      const dueAt = localToInstant({ date, time: localTime }, timezone);
+      const dueAt = localToInstant({ date, time: localTime });
       if (dueAt.getTime() > after.getTime()) {
         return {
           occurrenceKey: `${date}T${localTime}`,
@@ -126,11 +117,10 @@ export function nextOccurrence(
 export function occurrenceForObservedDate(
   ruleInput: RecurrenceRuleDto,
   observedAt: Date,
-  timezone: string,
   once?: { openEnded: boolean; fixedDates?: string[] },
 ): { occurrenceKey: string; localDate: string } | null {
   const rule = normalizeRule(ruleInput);
-  const date = zonedParts(observedAt, timezone).date;
+  const date = zonedParts(observedAt).date;
   if (compareDate(date, parseDate(rule.startDate)) < 0) return null;
   if (rule.type === "ONCE" && once) {
     const localDate = formatDate(date);
@@ -143,10 +133,9 @@ export function occurrenceForObservedDate(
   return { occurrenceKey: formatDate(date), localDate: formatDate(date) };
 }
 
-export function localToInstant(input: LocalDateTime, timezone: string): Date {
+export function localToInstant(input: LocalDateTime): Date {
   validateLocalDate(input.date);
   validateLocalTime(input.time);
-  validateTimezone(timezone);
   const desired = localTuple(input.date, input.time);
   const approximate = Date.UTC(
     desired.year,
@@ -162,7 +151,7 @@ export function localToInstant(input: LocalDateTime, timezone: string): Date {
     offsetMinutes += 1
   ) {
     const instant = new Date(approximate + offsetMinutes * 60_000);
-    const parts = zonedParts(instant, timezone);
+    const parts = zonedParts(instant);
     const comparison = compareTuple(parts, desired);
     if (comparison === 0) return instant;
     if (
@@ -176,20 +165,17 @@ export function localToInstant(input: LocalDateTime, timezone: string): Date {
   if (firstAfterGap) return firstAfterGap;
   throw new ApiError(
     "VALIDATION_ERROR",
-    "local date/time cannot be resolved in timezone",
+    "local date/time cannot be resolved in Asia/Seoul",
   );
 }
 
-export function zonedParts(
-  instant: Date,
-  timezone: string,
-): {
+export function zonedParts(instant: Date): {
   date: DateParts;
   hour: number;
   minute: number;
 } {
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
+    timeZone: TODO_TIMEZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -208,11 +194,10 @@ export function zonedParts(
 
 export function scheduleEligible(
   observedAt: Date,
-  timezone: string,
   windows: Array<{ date?: string | null; startTime: string; endTime: string }>,
 ): boolean {
   if (!windows.length) return true;
-  const parts = zonedParts(observedAt, timezone);
+  const parts = zonedParts(observedAt);
   const date = formatDate(parts.date);
   const minute = parts.hour * 60 + parts.minute;
   return windows.some((window) => {

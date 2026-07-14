@@ -11,7 +11,6 @@ import {
   RecurrenceRuleDto,
   ScheduleWindowDto,
   TodoDto,
-  TodoKind,
   TriggerConditionDto,
 } from "../contracts/v1";
 import { ConfigService } from "../config/config.service";
@@ -22,7 +21,6 @@ import {
   normalizeRule,
   timeMinute,
   validateLocalTime,
-  validateTimezone,
   validateWindows,
 } from "./recurrence";
 
@@ -30,8 +28,7 @@ interface TodoRow {
   id: string;
   account_id: string;
   content: string;
-  kind: TodoKind;
-  timezone: string;
+  is_location: boolean;
   recurrence_type: RecurrenceRuleDto["type"];
   recurrence_start_date: string | Date;
   recurrence_weekdays: number[];
@@ -58,8 +55,6 @@ interface WindowRow {
 
 export interface TodoInput {
   content: string;
-  kind: TodoKind;
-  timezone: string;
   recurrence: RecurrenceRuleDto;
   localTime?: string | null;
   triggerCondition?: TriggerConditionDto | null;
@@ -69,8 +64,7 @@ export interface TodoInput {
 
 interface ValidatedTodoInput {
   content: string;
-  kind: TodoKind;
-  timezone: string;
+  isLocation: boolean;
   recurrence: RecurrenceRuleDto;
   localTime: string | null;
   triggerType: TriggerConditionDto["type"] | null;
@@ -89,7 +83,7 @@ export class TodoService {
 
   async list(accountId: string, deleted = false): Promise<TodoDto[]> {
     const result = await this.db.query<TodoRow>(
-      `select * from todos where account_id=$1 and ${deleted ? "deleted_at is not null" : "deleted_at is null"} order by updated_at desc`,
+      `${todoSelect()} where t.account_id=$1 and ${deleted ? "t.deleted_at is not null" : "t.deleted_at is null"} order by t.updated_at desc`,
       [accountId],
     );
     return Promise.all(result.rows.map((row) => this.toDto(row)));
@@ -104,19 +98,17 @@ export class TodoService {
     const value = this.validateInput(input);
     const id = await this.db.transaction(async (query) => {
       await lockMonitoringGraph(account.id, query);
-      if (value.kind === "LOCATION")
+      if (value.isLocation)
         await this.quota.assertAvailable(account, "locationTodo", query);
       else await this.consumeTimeMutation(account.id, query);
       await this.assertGeofences(account.id, value.geofenceIds, query);
       const result = await query<{ id: string }>(
-        `insert into todos(account_id,content,kind,timezone,recurrence_type,recurrence_start_date,
+        `insert into todos(account_id,content,recurrence_type,recurrence_start_date,
          recurrence_weekdays,recurrence_month_days,local_time,trigger_type,trigger_minutes)
-         values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`,
+         values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id`,
         [
           account.id,
           value.content,
-          value.kind,
-          value.timezone,
           value.recurrence.type,
           value.recurrence.startDate,
           value.recurrence.weekdays ?? [],
@@ -128,7 +120,7 @@ export class TodoService {
       );
       const todoId = result.rows[0]!.id;
       await this.replaceRelations(todoId, value, query);
-      if (value.kind === "TIME")
+      if (!value.isLocation)
         await this.scheduleNext(todoId, value, new Date(), query);
       return todoId;
     });
@@ -146,7 +138,7 @@ export class TodoService {
     await this.db.transaction(async (query) => {
       await lockMonitoringGraph(account.id, query);
       const currentResult = await query<TodoRow>(
-        "select * from todos where id=$1 and account_id=$2 for update",
+        `${todoSelect()} where t.id=$1 and t.account_id=$2 for update of t`,
         [id, account.id],
       );
       const current = currentResult.rows[0];
@@ -161,25 +153,19 @@ export class TodoService {
         throw new ApiError("VERSION_CONFLICT", "TODO version changed", 409, {
           currentVersion: current.version,
         });
-      if (current.kind !== value.kind)
-        throw new ApiError(
-          "TODO_KIND_IMMUTABLE",
-          "TODO kind cannot be changed",
-          409,
-        );
-      if (current.kind === "TIME")
-        await this.consumeTimeMutation(account.id, query);
+      if (value.isLocation && !current.is_location)
+        await this.quota.assertAvailable(account, "locationTodo", query);
+      if (!value.isLocation) await this.consumeTimeMutation(account.id, query);
       await this.assertGeofences(account.id, value.geofenceIds, query);
       await query(
-        `update todos set content=$3,timezone=$4,recurrence_type=$5,recurrence_start_date=$6,
-         recurrence_weekdays=$7,recurrence_month_days=$8,local_time=$9,trigger_type=$10,trigger_minutes=$11,
+        `update todos set content=$3,recurrence_type=$4,recurrence_start_date=$5,
+         recurrence_weekdays=$6,recurrence_month_days=$7,local_time=$8,trigger_type=$9,trigger_minutes=$10,
          activation_generation=activation_generation+1,activated_at=now(),
          version=version+1,updated_at=now(),next_occurrence_at=null where id=$1 and account_id=$2`,
         [
           id,
           account.id,
           value.content,
-          value.timezone,
           value.recurrence.type,
           value.recurrence.startDate,
           value.recurrence.weekdays ?? [],
@@ -191,7 +177,7 @@ export class TodoService {
       );
       await this.replaceRelations(id, value, query);
       await this.cancelPending(id, query);
-      if (value.kind === "TIME" && current.active && !current.completed_at)
+      if (!value.isLocation && current.active && !current.completed_at)
         await this.scheduleNext(id, value, new Date(), query);
     });
     return this.get(account.id, id);
@@ -210,7 +196,7 @@ export class TodoService {
     await this.db.transaction(async (query) => {
       await lockMonitoringGraph(accountId, query);
       const result = await query<TodoRow>(
-        "select * from todos where id=$1 and account_id=$2 for update",
+        `${todoSelect()} where t.id=$1 and t.account_id=$2 for update of t`,
         [id, accountId],
       );
       const row = result.rows[0];
@@ -228,9 +214,9 @@ export class TodoService {
           409,
         );
       if (active) this.assertFutureTimeActivation(row);
-      if (active && row.kind === "LOCATION")
+      if (active && row.is_location)
         await this.assertLinkedGeofences(id, accountId, query);
-      if (row.kind === "TIME") await this.consumeTimeMutation(accountId, query);
+      if (!row.is_location) await this.consumeTimeMutation(accountId, query);
       await query(
         `update todos set active=$3,lifecycle_status=$4,activation_generation=activation_generation+1,
          activated_at=case when $3 then now() else activated_at end,
@@ -238,7 +224,7 @@ export class TodoService {
         [id, accountId, active, active ? "ACTIVE" : "INACTIVE"],
       );
       await this.cancelPending(id, query);
-      if (active && row.kind === "TIME")
+      if (active && !row.is_location)
         await this.scheduleNext(id, fromRow(row), new Date(), query);
     });
     return this.get(accountId, id);
@@ -254,7 +240,7 @@ export class TodoService {
     await this.db.transaction(async (query) => {
       await lockMonitoringGraph(accountId, query);
       const current = await query<TodoRow>(
-        "select * from todos where id=$1 and account_id=$2 for update",
+        `${todoSelect()} where t.id=$1 and t.account_id=$2 for update of t`,
         [id, accountId],
       );
       const row = current.rows[0];
@@ -265,7 +251,7 @@ export class TodoService {
           "TODO cannot be completed with this version",
           409,
         );
-      if (row.kind === "TIME") await this.consumeTimeMutation(accountId, query);
+      if (!row.is_location) await this.consumeTimeMutation(accountId, query);
       await query(
         `update todos set active=false,lifecycle_status='COMPLETED',completed_at=now(),next_occurrence_at=null,
          activation_generation=activation_generation+1,version=version+1,updated_at=now()
@@ -287,7 +273,7 @@ export class TodoService {
     await this.db.transaction(async (query) => {
       await lockMonitoringGraph(account.id, query);
       const result = await query<TodoRow>(
-        "select * from todos where id=$1 and account_id=$2 for update",
+        `${todoSelect()} where t.id=$1 and t.account_id=$2 for update of t`,
         [id, account.id],
       );
       const row = result.rows[0];
@@ -305,17 +291,16 @@ export class TodoService {
           409,
         );
       this.assertFutureTimeActivation(row);
-      if (row.kind === "LOCATION")
+      if (row.is_location)
         await this.assertLinkedGeofences(id, account.id, query);
-      if (row.kind === "TIME")
-        await this.consumeTimeMutation(account.id, query);
+      if (!row.is_location) await this.consumeTimeMutation(account.id, query);
       await query(
         `update todos set active=true,lifecycle_status='ACTIVE',completed_at=null,next_occurrence_at=null,activated_at=now(),
          activation_generation=activation_generation+1,version=version+1,updated_at=now() where id=$1`,
         [id],
       );
       await this.cancelPending(id, query);
-      if (row.kind === "TIME")
+      if (!row.is_location)
         await this.scheduleNext(id, fromRow(row), new Date(), query);
     });
     return this.get(account.id, id);
@@ -331,7 +316,7 @@ export class TodoService {
     await this.db.transaction(async (query) => {
       await lockMonitoringGraph(accountId, query);
       const current = await query<TodoRow>(
-        "select * from todos where id=$1 and account_id=$2 for update",
+        `${todoSelect()} where t.id=$1 and t.account_id=$2 for update of t`,
         [id, accountId],
       );
       const row = current.rows[0];
@@ -342,7 +327,7 @@ export class TodoService {
           "TODO cannot be deleted with this version",
           409,
         );
-      if (row.kind === "TIME") await this.consumeTimeMutation(accountId, query);
+      if (!row.is_location) await this.consumeTimeMutation(accountId, query);
       await query(
         `update todos set active=false,lifecycle_status='INACTIVE',deleted_at=now(),next_occurrence_at=null,
          activation_generation=activation_generation+1,version=version+1,updated_at=now()
@@ -364,7 +349,7 @@ export class TodoService {
     await this.db.transaction(async (query) => {
       await lockMonitoringGraph(account.id, query);
       const result = await query<TodoRow>(
-        "select * from todos where id=$1 and account_id=$2 for update",
+        `${todoSelect()} where t.id=$1 and t.account_id=$2 for update of t`,
         [id, account.id],
       );
       const row = result.rows[0];
@@ -374,7 +359,7 @@ export class TodoService {
         throw new ApiError("VERSION_CONFLICT", "TODO version changed", 409, {
           currentVersion: row.version,
         });
-      if (row.kind === "LOCATION")
+      if (row.is_location)
         await this.quota.assertAvailable(account, "locationTodo", query);
       else await this.consumeTimeMutation(account.id, query);
       await query(
@@ -387,28 +372,31 @@ export class TodoService {
   }
 
   private validateInput(input: TodoInput): ValidatedTodoInput {
-    if (!input || !["LOCATION", "TIME"].includes(input.kind))
-      throw new ApiError("VALIDATION_ERROR", "kind is invalid");
+    if (!input || typeof input !== "object")
+      throw new ApiError("VALIDATION_ERROR", "TODO body is required");
     const content = requireString(input.content, "content", 500);
-    const timezone = validateTimezone(
-      requireString(input.timezone, "timezone", 100),
-    );
     const recurrence = normalizeRule(input.recurrence);
-    if (input.kind === "TIME") {
-      if (
-        input.geofenceIds?.length ||
-        input.scheduleWindows?.length ||
-        input.triggerCondition
-      ) {
+    if (input.geofenceIds !== undefined && !Array.isArray(input.geofenceIds))
+      throw new ApiError("VALIDATION_ERROR", "geofenceIds must be an array");
+    const ids = [...new Set(input.geofenceIds ?? [])];
+    if (ids.length > 20)
+      throw new ApiError(
+        "VALIDATION_ERROR",
+        "TODO accepts at most 20 geofenceIds",
+      );
+    ids.forEach((id) => requireUuid(id, "geofenceId"));
+    const isLocation = ids.length > 0;
+    if (!isLocation) {
+      if (input.scheduleWindows?.length || input.triggerCondition) {
         throw new ApiError(
-          "TODO_KIND_MISMATCH",
-          "TIME TODO cannot contain location fields",
+          "TODO_FIELD_MISMATCH",
+          "A TODO without saved places cannot contain location fields",
         );
       }
       const localTime = validateLocalTime(
         requireString(input.localTime, "localTime", 5, 5),
       );
-      const next = nextOccurrence(recurrence, localTime, timezone, new Date());
+      const next = nextOccurrence(recurrence, localTime, new Date());
       if (recurrence.type === "ONCE" && !next) {
         throw new ApiError(
           "PAST_ONCE_OCCURRENCE",
@@ -417,8 +405,7 @@ export class TodoService {
       }
       return {
         content,
-        kind: input.kind,
-        timezone,
+        isLocation,
         recurrence,
         localTime,
         triggerType: null,
@@ -429,16 +416,9 @@ export class TodoService {
     }
     if (input.localTime)
       throw new ApiError(
-        "TODO_KIND_MISMATCH",
-        "LOCATION TODO cannot contain localTime",
+        "TODO_FIELD_MISMATCH",
+        "A TODO with saved places cannot contain localTime",
       );
-    const ids = [...new Set(input.geofenceIds ?? [])];
-    if (!ids.length || ids.length > 20)
-      throw new ApiError(
-        "VALIDATION_ERROR",
-        "LOCATION TODO requires 1..20 geofenceIds",
-      );
-    ids.forEach((id) => requireUuid(id, "geofenceId"));
     const condition = input.triggerCondition;
     if (
       !condition ||
@@ -467,8 +447,7 @@ export class TodoService {
     );
     return {
       content,
-      kind: input.kind,
-      timezone,
+      isLocation,
       recurrence,
       localTime: null,
       triggerType: condition.type,
@@ -543,12 +522,11 @@ export class TodoService {
 
   private assertFutureTimeActivation(row: TodoRow): void {
     if (
-      row.kind === "TIME" &&
+      !row.is_location &&
       row.local_time &&
       !nextOccurrence(
         fromRow(row).recurrence,
         row.local_time.slice(0, 5),
-        row.timezone,
         new Date(),
       )
     )
@@ -566,12 +544,7 @@ export class TodoService {
     query: Query,
   ): Promise<void> {
     if (!input.localTime) return;
-    const next = nextOccurrence(
-      input.recurrence,
-      input.localTime,
-      input.timezone,
-      after,
-    );
+    const next = nextOccurrence(input.recurrence, input.localTime, after);
     if (!next) {
       await query("update todos set next_occurrence_at=null where id=$1", [
         todoId,
@@ -642,7 +615,7 @@ export class TodoService {
   private async requireOwned(accountId: string, id: string): Promise<TodoRow> {
     requireUuid(id, "todoId");
     const result = await this.db.query<TodoRow>(
-      "select * from todos where id=$1 and account_id=$2",
+      `${todoSelect()} where t.id=$1 and t.account_id=$2`,
       [id, accountId],
     );
     if (!result.rows[0])
@@ -682,8 +655,6 @@ export class TodoService {
     return {
       id: row.id,
       content: row.content,
-      kind: row.kind,
-      timezone: row.timezone,
       recurrence,
       localTime: row.local_time?.slice(0, 5) ?? null,
       triggerCondition,
@@ -709,8 +680,7 @@ export class TodoService {
 function fromRow(row: TodoRow): ValidatedTodoInput {
   return {
     content: row.content,
-    kind: row.kind,
-    timezone: row.timezone,
+    isLocation: row.is_location,
     recurrence: {
       type: row.recurrence_type,
       startDate: dateString(row.recurrence_start_date),
@@ -723,6 +693,12 @@ function fromRow(row: TodoRow): ValidatedTodoInput {
     scheduleWindows: [],
     geofenceIds: [],
   };
+}
+
+function todoSelect(): string {
+  return `select t.*,
+    exists(select 1 from todo_geofences tg where tg.todo_id=t.id) is_location
+    from todos t`;
 }
 
 function dateString(value: string | Date): string {

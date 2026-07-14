@@ -25,7 +25,6 @@ export interface AppConfig {
   sessionIdleSeconds: number;
   sessionAbsoluteSeconds: number;
   tokenEncryptionKey: Buffer;
-  defaultTimezone: string;
   kakaoRestApiKey?: string;
   kakaoJavascriptKey?: string;
   firebaseProjectId?: string;
@@ -101,15 +100,6 @@ function encryptionKey(): Buffer {
   return key;
 }
 
-function timezone(value: string): string {
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: value }).format();
-    return value;
-  } catch {
-    throw new Error("DEFAULT_TIMEZONE must be an IANA timezone");
-  }
-}
-
 export function loadAppConfig(): AppConfig {
   const nodeEnv = process.env.NODE_ENV || "development";
   const publicOrigin = url("PUBLIC_ORIGIN", "http://localhost:3042");
@@ -164,7 +154,6 @@ export function loadAppConfig(): AppConfig {
       300,
     ),
     tokenEncryptionKey: encryptionKey(),
-    defaultTimezone: timezone(process.env.DEFAULT_TIMEZONE || "Asia/Seoul"),
     kakaoRestApiKey: process.env.KAKAO_REST_API_KEY,
     kakaoJavascriptKey: process.env.KAKAO_JAVASCRIPT_KEY,
     firebaseProjectId: process.env.FIREBASE_PROJECT_ID,
